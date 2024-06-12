@@ -132,6 +132,13 @@ async function run() {
     //   res.send(result);
     // })
 
+    // Announcement related api
+    app.post('/announcements',verifyToken, verifyAdmin, async(req,res)=>{
+      const announcement = req.body;
+      const result = await announcementCollection.insertOne(announcement);
+      res.send(result);
+    })
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
