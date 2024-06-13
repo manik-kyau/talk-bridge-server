@@ -56,19 +56,19 @@ async function run() {
     }
 
     // use verify admin after verifyToken
-    const verifyAdmin = async(req, res, next) => {
+    const verifyAdmin = async (req, res, next) => {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
       const isAdmin = user?.role === 'admin';
-      if(!isAdmin){
+      if (!isAdmin) {
         return res.status(403).send({ message: 'forbidden access' });
       }
       next();
     }
 
     // users relaated api
-    app.get('/users', verifyToken,verifyAdmin, async (req, res) => {
+    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
       // console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
@@ -101,7 +101,7 @@ async function run() {
     })
 
     // create admin
-    app.patch('/users/admin/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.patch('/users/admin/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
@@ -113,7 +113,7 @@ async function run() {
       res.send(result);
     })
     // delete user
-    app.delete('/users/:id',verifyToken,verifyAdmin, async (req, res) => {
+    app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await userCollection.deleteOne(query);
@@ -133,9 +133,44 @@ async function run() {
     // })
 
     // Announcement related api
-    app.post('/announcements',verifyToken, verifyAdmin, async(req,res)=>{
+    app.get('/announcements', async (req, res) => {
+      const result = await announcementCollection.find().toArray();
+      res.send(result);
+    })
+
+    app.get('/announcements/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await announcementCollection.findOne(query);
+      res.send(result);
+    })
+
+    app.post('/announcements', verifyToken, verifyAdmin, async (req, res) => {
       const announcement = req.body;
       const result = await announcementCollection.insertOne(announcement);
+      res.send(result);
+    })
+
+    app.patch('/announcements/:id', verifyToken, verifyAdmin, async(req,res)=>{
+      const announcement = req.body;
+      const id = req.params.id;
+      const filter = {_id: new ObjectId(id)}
+      const updatedDoc = {
+         $set:{
+          title: announcement.title,
+          description: announcement.description,
+          authorName: announcement.authorName,
+          image: announcement.image,
+        }
+      }
+      const result = await announcementCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    app.delete('/announcements/:id', verifyToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await announcementCollection.deleteOne(query);
       res.send(result);
     })
 
