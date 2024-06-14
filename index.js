@@ -4,6 +4,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY)
 const port = process.env.PORT || 5000;
 
 // middlewire
@@ -31,6 +32,7 @@ async function run() {
     const userCollection = client.db("talkbridgeDB").collection("users");
     const postCollection = client.db("talkbridgeDB").collection("posts");
     const announcementCollection = client.db("talkbridgeDB").collection("announcements");
+    const paymentCollection = client.db("talkbridgeDB").collection("paymentss");
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -68,7 +70,8 @@ async function run() {
     }
 
     // users relaated api
-    app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+    // TODO: verifyToken, verifyAdmin
+    app.get('/users', async (req, res) => {
       // console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
@@ -97,6 +100,22 @@ async function run() {
         return res.send({ message: 'User Already exists', insertedId: null })
       }
       const result = await userCollection.insertOne(user);
+      res.send(result);
+    })
+
+    app.patch('/users/:email',async(req,res)=>{
+      // const email =  req.params.email;
+      // console.log(email);
+      const userBadge = req.body;
+      const updatedDoc = {
+        $set: {
+          name: userBadge.name,
+          email: userBadge.email,
+          image: userBadge.image,
+          badge: userBadge.badge,
+        }
+      }
+      const result = await userCollection.updateOne({email:req.params.email}, updatedDoc);
       res.send(result);
     })
 
@@ -151,12 +170,12 @@ async function run() {
       res.send(result);
     })
 
-    app.patch('/announcements/:id', verifyToken, verifyAdmin, async(req,res)=>{
+    app.patch('/announcements/:id', verifyToken, verifyAdmin, async (req, res) => {
       const announcement = req.body;
       const id = req.params.id;
-      const filter = {_id: new ObjectId(id)}
+      const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
-         $set:{
+        $set: {
           title: announcement.title,
           description: announcement.description,
           authorName: announcement.authorName,
@@ -174,6 +193,27 @@ async function run() {
       res.send(result);
     })
 
+    // payment intent
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price * 100);
+      // console.log(amount, 'error inside the part of life.');
+
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+      res.send({
+        clientSecret: paymentIntent.client_secret
+      })
+    })
+
+    app.post('/payments',async(req,res)=>{
+      const payment = req.body;
+      const result = await paymentCollection.insertOne(payment);
+      res.send(result);
+    })
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
