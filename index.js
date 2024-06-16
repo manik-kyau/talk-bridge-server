@@ -33,6 +33,7 @@ async function run() {
     const postCollection = client.db("talkbridgeDB").collection("posts");
     const announcementCollection = client.db("talkbridgeDB").collection("announcements");
     const paymentCollection = client.db("talkbridgeDB").collection("paymentss");
+    const commentCollection = client.db("talkbridgeDB").collection("comments");
 
     // jwt related api
     app.post('/jwt', async (req, res) => {
@@ -140,21 +141,27 @@ async function run() {
     })
 
     // Posts related api
-    app.get('/posts',async(req,res)=>{
-      console.log(req.query.authorEmail);
-      let query = {};
-      if(req.query?.authorEmail){
-        query = {authorEmail: req.query.authorEmail}
-      }
-      const result = await postCollection.find(query).toArray();
-      res.send(result);
-
-    })
-    
     app.get('/posts', async (req, res) => {
-      const result = await postCollection.find().toArray();
-      res.send(result);
+      const page = parseInt(req.query.page);
+      const size = parseInt(req.query.size)
+      const filter = req.query;
+      console.log('pagination query:',page, size,filter);
+      const query = {
+        tag: {$regex: filter.search, $options: 'i'}
+      }
+      const result = await postCollection.find(query)
+      .skip(page * size)
+      .limit(size)
+      .toArray();
+      res.send(result); 
     })
+
+    // pagination 
+    app.get('/postsCount', async(req,res)=>{
+      const count = await postCollection.estimatedDocumentCount();
+      res.send({count});
+    })
+
 
     app.post('/posts',async(req,res)=>{
       const post = req.body;
@@ -162,7 +169,7 @@ async function run() {
       res.send(result);
     })
     // TODO: verifyToken, verifyAdmin
-    app.delete('/posts/:id', async (req, res) => {
+    app.delete('/specificPosts/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await postCollection.deleteOne(query);
@@ -230,6 +237,17 @@ async function run() {
     app.post('/payments',async(req,res)=>{
       const payment = req.body;
       const result = await paymentCollection.insertOne(payment);
+      res.send(result);
+    })
+
+    // specific user post
+    app.get('/specificPosts',async(req,res)=>{
+      console.log(req.query.authorEmail);
+      let query = {};
+      if(req.query?.authorEmail){
+        query = {authorEmail: req.query.authorEmail}
+      }
+      const result = await postCollection.find(query).toArray();
       res.send(result);
     })
 
