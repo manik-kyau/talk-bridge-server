@@ -70,7 +70,7 @@ async function run() {
     }
 
     // users relaated api
-    // TODO: verifyToken, verifyAdmin
+    // verifyToken, verifyAdmin,
     app.get('/users', async (req, res) => {
       // console.log(req.headers);
       const result = await userCollection.find().toArray();
@@ -112,7 +112,7 @@ async function run() {
           name: userBadge.name,
           email: userBadge.email,
           image: userBadge.image,
-          badge: userBadge.badge,
+          badge: 'gold',
         }
       }
       const result = await userCollection.updateOne({email:req.params.email}, updatedDoc);
@@ -140,16 +140,34 @@ async function run() {
     })
 
     // Posts related api
+    app.get('/posts',async(req,res)=>{
+      console.log(req.query.authorEmail);
+      let query = {};
+      if(req.query?.authorEmail){
+        query = {authorEmail: req.query.authorEmail}
+      }
+      const result = await postCollection.find(query).toArray();
+      res.send(result);
+
+    })
+    
     app.get('/posts', async (req, res) => {
       const result = await postCollection.find().toArray();
       res.send(result);
     })
 
-    // app.post('/posts',async(req,res)=>{
-    //   const post = req.body;
-    //   const result = await postCollection.insertOne(post);
-    //   res.send(result);
-    // })
+    app.post('/posts',async(req,res)=>{
+      const post = req.body;
+      const result = await postCollection.insertOne(post);
+      res.send(result);
+    })
+    // TODO: verifyToken, verifyAdmin
+    app.delete('/posts/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await postCollection.deleteOne(query);
+      res.send(result);
+    })
 
     // Announcement related api
     app.get('/announcements', async (req, res) => {
