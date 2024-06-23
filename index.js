@@ -44,7 +44,7 @@ async function run() {
 
     // middlewires
     const verifyToken = (req, res, next) => {
-      console.log('inside verify token: ', req.headers.authorization);
+      // console.log('inside verify token: ', req.headers.authorization);
       if (!req.headers.authorization) {
         return res.status(401).send({ message: 'unauthorized access' });
       }
@@ -63,7 +63,7 @@ async function run() {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      const isAdmin = user?.role === 'admin';
+      const isAdmin = user?.role.toLowerCase() === 'admin';
       if (!isAdmin) {
         return res.status(403).send({ message: 'forbidden access' });
       }
@@ -73,7 +73,7 @@ async function run() {
     // users relaated api
     // verifyToken, verifyAdmin,
     app.get('/users', async (req, res) => {
-      // console.log(req.headers);
+      console.log(req.headers);
       const result = await userCollection.find().toArray();
       res.send(result);
     })
@@ -104,8 +104,8 @@ async function run() {
       res.send(result);
     })
 
-    app.patch('/users/:email',async(req,res)=>{
-      // const email =  req.params.email;
+    app.patch('/users/:email', async (req, res) => {
+      const email =  req.params.email;
       // console.log(email);
       const userBadge = req.body;
       const updatedDoc = {
@@ -113,10 +113,10 @@ async function run() {
           name: userBadge.name,
           email: userBadge.email,
           image: userBadge.image,
-          badge: 'gold',
+          badge: 'Gold',
         }
       }
-      const result = await userCollection.updateOne({email:req.params.email}, updatedDoc);
+      const result = await userCollection.updateOne({ email: req.params.email }, updatedDoc);
       res.send(result);
     })
 
@@ -132,6 +132,7 @@ async function run() {
       const result = await userCollection.updateOne(filter, updatedDoc);
       res.send(result);
     })
+
     // delete user
     app.delete('/users/:id', verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
@@ -145,29 +146,60 @@ async function run() {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size)
       const filter = req.query;
-      console.log('pagination query:',page, size,filter);
-      const query = {
-        tag: {$regex: filter.search, $options: 'i'}
+      // console.log('pagination query:',page, size,filter);
+      let query = {}
+      if(filter.search){
+        query = {tag: filter.search.toLowerCase()}
       }
-      const result = await postCollection.find(query)
-      .skip(page * size)
-      .limit(size)
-      .toArray();
-      res.send(result); 
+      console.log(query);
+      const result = await postCollection.find(query).sort({postTime: -1})
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+        console.log(result);
+      res.send(result);
     })
+    // app.get('/posts2',async(req,res)=>{
+    //   console.log('hellow');
+    //   const result = await postCollection.find().toArray();
+    //   res.send(result);
+    // })
 
     // pagination 
-    app.get('/postsCount', async(req,res)=>{
+    app.get('/postsCount', async (req, res) => {
       const count = await postCollection.estimatedDocumentCount();
-      res.send({count});
+      res.send({ count });
     })
 
 
-    app.post('/posts',async(req,res)=>{
+    app.post('/posts', async (req, res) => {
       const post = req.body;
       const result = await postCollection.insertOne(post);
       res.send(result);
     })
+
+    // TODO:verifyToken,
+    app.patch('/posts/:id', verifyToken, async (req, res) => {
+      const post = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          // postTitle: post.postTitle,
+          // postDescription: post.postDescription,
+          // tag: post.tag,
+          upVote: post.upVote,
+          downVote: post.downVote,
+          // authorName: post.authorName,
+          // authorEmail: post.authorEmail,
+          // authorImage: post.authorImage,
+          // postTime: post.postTime,
+        }
+      }
+      const result = await postCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
     // TODO: verifyToken, verifyAdmin
     app.delete('/specificPosts/:id', async (req, res) => {
       const id = req.params.id;
@@ -234,21 +266,52 @@ async function run() {
       })
     })
 
-    app.post('/payments',async(req,res)=>{
+    app.post('/payments', async (req, res) => {
       const payment = req.body;
       const result = await paymentCollection.insertOne(payment);
       res.send(result);
     })
 
+
+
     // specific user post
-    app.get('/specificPosts',async(req,res)=>{
-      console.log(req.query.authorEmail);
+    app.get('/specificPosts', async (req, res) => {
+      // console.log(req.query.authorEmail);
       let query = {};
-      if(req.query?.authorEmail){
-        query = {authorEmail: req.query.authorEmail}
+      if (req.query?.authorEmail) {
+        query = { authorEmail: req.query.authorEmail }
       }
-      const result = await postCollection.find(query).toArray();
+      const result = await postCollection.find(query,{postTime: -1}).toArray();
       res.send(result);
+    })
+
+    // Comment related api
+    app.get('/comments', async (req, res) => {
+      // console.log(req.query.postId);
+      let query = {};
+      if (req.query.postId) {
+        query = { postId: req.query.postId }
+      }
+      const result = await commentCollection.find(query).toArray();
+      res.send(result);
+    })
+    app.post('/comments', async (req, res) => {
+      const comment = req.body;
+      const result = await commentCollection.insertOne(comment);
+      res.send(result)
+    })
+
+    // Admin stats
+    // TODO:  verifyToken, verifyAdmin,
+    app.get('/admin-stats', async (req, res) => {
+      const users = await userCollection.estimatedDocumentCount();
+      const posts = await postCollection.estimatedDocumentCount();
+      const comments = await commentCollection.estimatedDocumentCount();
+      res.send({
+        users,
+        posts,
+        comments,
+      })
     })
 
     // Send a ping to confirm a successful connection
