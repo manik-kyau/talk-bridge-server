@@ -63,7 +63,7 @@ async function run() {
       const email = req.decoded.email;
       const query = { email: email };
       const user = await userCollection.findOne(query);
-      const isAdmin = user?.role.toLowerCase() === 'admin';
+      const isAdmin = user?.role === 'admin';
       if (!isAdmin) {
         return res.status(403).send({ message: 'forbidden access' });
       }
@@ -71,10 +71,19 @@ async function run() {
     }
 
     // users relaated api
-    // verifyToken, verifyAdmin,
+    // TODO: verifyToken, verifyAdmin,
     app.get('/users', async (req, res) => {
-      console.log(req.headers);
-      const result = await userCollection.find().toArray();
+      // console.log(req.headers);
+      const filter = req.query;
+      console.log(filter);
+      // const query = {
+      //   name: {$regex: filter.search, $options: 'i'}
+      // }
+      let query = {}
+      if(filter.search){
+        query = {name: filter.search.toLowerCase()}
+      }
+      const result = await userCollection.find(query).toArray();
       res.send(result);
     })
 
@@ -146,24 +155,19 @@ async function run() {
       const page = parseInt(req.query.page);
       const size = parseInt(req.query.size)
       const filter = req.query;
-      // console.log('pagination query:',page, size,filter);
+      console.log('pagination query:',page, size,filter);
       let query = {}
+      
       if(filter.search){
         query = {tag: filter.search.toLowerCase()}
       }
-      console.log(query);
       const result = await postCollection.find(query).sort({postTime: -1})
         .skip(page * size)
         .limit(size)
         .toArray();
-        console.log(result);
+        // console.log(result);
       res.send(result);
     })
-    // app.get('/posts2',async(req,res)=>{
-    //   console.log('hellow');
-    //   const result = await postCollection.find().toArray();
-    //   res.send(result);
-    // })
 
     // pagination 
     app.get('/postsCount', async (req, res) => {
@@ -178,30 +182,56 @@ async function run() {
       res.send(result);
     })
 
-    // TODO:verifyToken,
-    app.patch('/posts/:id', verifyToken, async (req, res) => {
+    app.patch('/posts/:id', verifyToken,verifyToken, async (req, res) => {
       const post = req.body;
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) }
       const updatedDoc = {
         $set: {
-          // postTitle: post.postTitle,
-          // postDescription: post.postDescription,
-          // tag: post.tag,
           upVote: post.upVote,
           downVote: post.downVote,
-          // authorName: post.authorName,
-          // authorEmail: post.authorEmail,
-          // authorImage: post.authorImage,
-          // postTime: post.postTime,
         }
       }
       const result = await postCollection.updateOne(filter, updatedDoc);
       res.send(result);
     })
 
+    app.get('/totalPost',async(req,res)=>{
+      // const filter = req.query;
+      // console.log(filter);
+      // let query = {}
+      // const options = {
+      //   sort: {
+      //     upVote: filter.sort === 'asc' ? 1 : -1
+      //   }
+      // };
+      const result = await postCollection.find().toArray();
+      res.send(result)
+    })
+    app.patch('/totalPost/:id', verifyToken, async (req, res) => {
+      const post = req.body;
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const updatedDoc = {
+        $set: {
+          postTitle: post.postTitle,
+          postDescription: post.postDescription,
+          tag: post.tag,
+        }
+      }
+      const result = await postCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    app.delete('/totalPost/:id', verifyToken , async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await postCollection.deleteOne(query);
+      res.send(result);
+    })
+
     // TODO: verifyToken, verifyAdmin
-    app.delete('/specificPosts/:id', async (req, res) => {
+    app.delete('/specificPosts/:id',verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await postCollection.deleteOne(query);
@@ -213,8 +243,8 @@ async function run() {
       const result = await announcementCollection.find().toArray();
       res.send(result);
     })
-
-    app.get('/announcements/:id', verifyToken, verifyAdmin, async (req, res) => {
+    
+    app.get('/announcements/:id', async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await announcementCollection.findOne(query);
@@ -226,7 +256,7 @@ async function run() {
       const result = await announcementCollection.insertOne(announcement);
       res.send(result);
     })
-
+    // TODO: verifyToken, verifyAdmin,
     app.patch('/announcements/:id', verifyToken, verifyAdmin, async (req, res) => {
       const announcement = req.body;
       const id = req.params.id;
@@ -281,7 +311,7 @@ async function run() {
       if (req.query?.authorEmail) {
         query = { authorEmail: req.query.authorEmail }
       }
-      const result = await postCollection.find(query,{postTime: -1}).toArray();
+      const result = await postCollection.find(query).toArray();
       res.send(result);
     })
 
@@ -303,7 +333,7 @@ async function run() {
 
     // Admin stats
     // TODO:  verifyToken, verifyAdmin,
-    app.get('/admin-stats', async (req, res) => {
+    app.get('/admin-stats',verifyToken, verifyAdmin, async (req, res) => {
       const users = await userCollection.estimatedDocumentCount();
       const posts = await postCollection.estimatedDocumentCount();
       const comments = await commentCollection.estimatedDocumentCount();
@@ -315,8 +345,8 @@ async function run() {
     })
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
